@@ -19,22 +19,28 @@ const contributionSchema = new mongoose.Schema({
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: function() {
-        return !this.isAnonymous;
-      }
+      required: false // Optionnel : présent seulement pour les utilisateurs connectés
     },
     name: {
       type: String,
-      required: [true, 'Le nom est requis'],
+      required: function() {
+        return !this.isAnonymous;
+      },
       trim: true
     },
     email: {
       type: String,
-      required: [true, 'L\'email est requis'],
+      required: function() {
+        return !this.isAnonymous;
+      },
       lowercase: true,
       trim: true,
       validate: {
         validator: function(v) {
+          // Si anonyme, pas de validation d'email
+          if (this.isAnonymous) {
+            return true;
+          }
           return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
         },
         message: 'Email invalide'
@@ -42,7 +48,7 @@ const contributionSchema = new mongoose.Schema({
     },
     message: {
       type: String,
-      maxlength: [500, 'Le message ne peut dépasser 500 caractères']
+      default: ''
     }
   },
   
@@ -124,6 +130,23 @@ const contributionSchema = new mongoose.Schema({
     issueDate: Date
   },
   
+  // Stripe IDs
+  stripeSessionId: {
+    type: String
+  },
+  stripePaymentIntentId: {
+    type: String
+  },
+  stripeChargeId: {
+    type: String
+  },
+  
+  // En cas d'échec
+  failureReason: String,
+  
+  // Date de remboursement
+  refundedAt: Date,
+  
   // Métadonnées
   ipAddress: String,
   userAgent: String,
@@ -154,40 +177,123 @@ contributionSchema.virtual('campaignAmount').get(function() {
 
 // Avant sauvegarde
 contributionSchema.pre('save', function(next) {
-  // Calculer le montant net
-  if (this.isModified('amount')) {
-    this.payment.netAmount = this.amount - this.payment.fees;
+  // S'assurer que payment existe
+  if (!this.payment) {
+    this.payment = {};
+  }
+  
+  // Calculer le montant net (si amount ou fees sont modifiés)
+  if (this.isModified('amount') || this.isModified('payment.fees')) {
+    // S'assurer que fees existe, sinon 0
+    const fees = this.payment.fees || 0;
+    this.payment.netAmount = this.amount - fees;
   }
   
   // Vérifier l'éligibilité au reçu fiscal (> 50€)
   if (this.isModified('amount')) {
+    if (!this.taxReceipt) {
+      this.taxReceipt = {};
+    }
     this.taxReceipt.eligible = this.amount >= 50;
   }
   
   next();
 });
 
-// Après sauvegarde
+// === Middleware pour mettre à jour les stats de la campagne ===
+// Après sauvegarde - mettre à jour les stats de la campagne
 contributionSchema.post('save', async function() {
   const Campaign = mongoose.model('Campaign');
   const User = mongoose.model('User');
   
+  // Seulement si la contribution est confirmée
   if (this.status === 'confirmed') {
-    // Mettre à jour la campagne
-    await Campaign.findByIdAndUpdate(this.campaign, {
-      $inc: { 
-        'currentAmount': this.amount,
-        'stats.contributorsCount': 1
+    try {
+      // 1. Recalculer le montant total des contributions confirmées
+      const contributions = await this.constructor.find({
+        campaign: this.campaign,
+        status: 'confirmed'
+      });
+      
+      // 2. Calculer le montant total
+      const totalAmount = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
+      
+      // 3. Calculer le nombre de contributeurs UNIQUES
+      const uniqueContributors = new Set();
+      contributions.forEach(contrib => {
+        if (contrib.contributor && contrib.contributor.userId) {
+          uniqueContributors.add(contrib.contributor.userId.toString());
+        }
+      });
+      
+      // 4. Calculer la moyenne par contribution
+      const averageContribution = contributions.length > 0 
+        ? totalAmount / contributions.length 
+        : 0;
+      
+      // 5. Mettre à jour la campagne
+      await Campaign.findByIdAndUpdate(this.campaign, {
+        currentAmount: totalAmount,
+        'stats.contributorsCount': uniqueContributors.size,
+        'stats.averageContribution': averageContribution
+      }, { new: true });
+      
+      // 6. Mettre à jour les stats de l'utilisateur (si connecté)
+      // Note: Le champ totalContributions n'existe pas dans le modèle User actuel
+      // Si nécessaire, ajouter ce champ au modèle User ou utiliser une agrégation
+      // if (this.contributor && this.contributor.userId) {
+      //   await User.findByIdAndUpdate(this.contributor.userId, {
+      //     $inc: { 'totalContributions': 1 }
+      //   });
+      // }
+      
+    } catch (error) {
+      console.error('❌ Erreur dans le middleware post-save Contribution:', error.message);
+    }
+  }
+});
+
+// Middleware pour supprimer une contribution (Mongoose 5.x+)
+// Utiliser findOneAndDelete et deleteOne au lieu de remove (obsolète)
+contributionSchema.post('findOneAndDelete', async function(doc) {
+  if (!doc || doc.status !== 'confirmed') return;
+  
+  const Campaign = mongoose.model('Campaign');
+  
+  try {
+    // Recalculer après suppression
+    const contributions = await this.model.find({
+      campaign: doc.campaign,
+      status: 'confirmed'
+    });
+    
+    const totalAmount = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
+    const uniqueContributors = new Set();
+    
+    contributions.forEach(contrib => {
+      if (contrib.contributor && contrib.contributor.userId) {
+        uniqueContributors.add(contrib.contributor.userId.toString());
       }
     });
     
-    // Mettre à jour les statistiques du contributeur (si connecté)
-    if (this.contributor.userId) {
-      await User.findByIdAndUpdate(this.contributor.userId, {
-        $inc: { 'totalContributions': 1 }
-      });
-    }
+    const averageContribution = contributions.length > 0 
+      ? totalAmount / contributions.length 
+      : 0;
+    
+    await Campaign.findByIdAndUpdate(doc.campaign, {
+      currentAmount: totalAmount,
+      'stats.contributorsCount': uniqueContributors.size,
+      'stats.averageContribution': averageContribution
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur dans le middleware post-findOneAndDelete Contribution:', error.message);
   }
+});
+
+contributionSchema.post('deleteOne', async function() {
+  // Note: deleteOne ne fournit pas le document dans le hook
+  // Cette logique est gérée dans le contrôleur ou via findOneAndDelete
 });
 
 // === Indexes pour performance ===
@@ -202,6 +308,10 @@ contributionSchema.index({
   status: 1, 
   createdAt: -1 
 });
+// Index pour Stripe
+contributionSchema.index({ stripeSessionId: 1 }, { sparse: true });
+contributionSchema.index({ stripePaymentIntentId: 1 }, { sparse: true });
+contributionSchema.index({ stripeChargeId: 1 }, { sparse: true });
 
 // === Méthodes d'instance ===
 
@@ -225,7 +335,7 @@ contributionSchema.methods.refund = function(reason) {
 
 // Obtenir les statistiques
 contributionSchema.statics.getStatistics = async function(campaignId = null) {
-  const matchStage = campaignId ? { campaign: mongoose.Types.ObjectId(campaignId) } : {};
+  const matchStage = campaignId ? { campaign: new mongoose.Types.ObjectId(campaignId) } : {};
   
   const stats = await this.aggregate([
     { $match: matchStage },

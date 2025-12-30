@@ -70,7 +70,7 @@ const campaignSchema = new mongoose.Schema({
   images: {
     mainImage: {
       type: String,
-      default: 'https://res.cloudinary.com/demo/image/upload/v1234567/default-campaign.jpg'
+      default: '/uploads/campaigns/default-campaign.jpg'
     },
     gallery: [{
       url: String,
@@ -110,7 +110,10 @@ const campaignSchema = new mongoose.Schema({
     address: String,
     coordinates: {
       type: { type: String, default: 'Point' },
-      coordinates: [Number] // [longitude, latitude]
+      coordinates: { 
+        type: [Number], 
+        default: [0, 0]  // Valeur par défaut
+      }
     }
   },
   
@@ -269,8 +272,16 @@ campaignSchema.pre('save', function(next) {
   // Mettre à jour le statut si nécessaire
   if (this.currentAmount >= this.goalAmount) {
     this.status = 'successful';
-  } else if (this.daysLeft <= 0 && this.status === 'active') {
-    this.status = 'expired';
+  } else {
+    // Calculer les jours restants directement (daysLeft est un virtual non disponible ici)
+    const now = new Date();
+    const end = new Date(this.endDate);
+    const diffTime = end - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 0 && this.status === 'active') {
+      this.status = 'expired';
+    }
   }
   
   next();

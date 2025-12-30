@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema({
   // Avatar/photo
   avatar: {
     type: String,
-    default: 'https://res.cloudinary.com/demo/image/upload/v1234567/default-avatar.png'
+    default: '/uploads/avatars/default-avatar.png'
   },
   
   // Adresse

@@ -17,10 +17,25 @@ const ContributionForm = ({ campaignId, onSubmit, onCancel }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({
-      ...formData,
-      amount: parseFloat(formData.amount)
-    });
+    const amount = parseFloat(formData.amount);
+    
+    if (isNaN(amount) || amount <= 0) {
+      alert('Veuillez entrer un montant valide');
+      return;
+    }
+    
+    // Préparer les données selon la structure attendue par le backend
+    const contributionData = {
+      amount: amount,
+      message: formData.message || '',
+      anonymous: formData.anonymous,
+      // Le backend gère automatiquement le contributor selon si l'utilisateur est connecté
+      // Si anonyme, on envoie isAnonymous: true
+      // Sinon, le backend utilisera les infos de l'utilisateur connecté
+      isAnonymous: formData.anonymous
+    };
+    
+    onSubmit(contributionData);
   };
 
   return (

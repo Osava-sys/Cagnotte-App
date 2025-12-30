@@ -17,17 +17,57 @@ const request = async (endpoint, options = {}) => {
     ...options
   };
 
+  // Ne pas ajouter Content-Type pour FormData
+  if (options.body instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
+    // Gérer le cas 304 (Not Modified) - réponse vide mais réussie
+    if (response.status === 304) {
+      return { success: true, data: [] };
+    }
+    
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Erreur serveur' }));
+      let error;
+      try {
+        error = await response.json();
+      } catch {
+        error = { 
+          success: false,
+          error: `Erreur serveur (${response.status})` 
+        };
+      }
       throw error;
     }
     
-    return await response.json();
+    // Essayer de parser le JSON, mais gérer le cas où le body est vide
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      return { success: true, data: [] };
+    }
+    
+    try {
+      const data = JSON.parse(text);
+      // Normaliser la réponse pour avoir toujours { success, data }
+      if (data.success !== undefined) {
+        return data;
+      }
+      // Si la réponse n'a pas de structure { success, data }, la wrapper
+      return { success: true, data };
+    } catch (parseError) {
+      console.error('Erreur parsing JSON:', parseError, 'Text:', text);
+      return { success: true, data: [] };
+    }
   } catch (error) {
-    throw error;
+    // Si c'est déjà un objet d'erreur formaté, le renvoyer tel quel
+    if (error.error || error.success === false) {
+      throw error;
+    }
+    // Sinon, wrapper l'erreur
+    throw { success: false, error: error.message || 'Erreur réseau' };
   }
 };
 
