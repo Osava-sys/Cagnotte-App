@@ -56,19 +56,36 @@ exports.validateLogin = [
   exports.validate
 ];
 
+// Catégories valides (synchronisées avec le modèle Campaign et le frontend)
+const VALID_CATEGORIES = [
+  'medical',      // Santé & Médical
+  'education',    // Éducation
+  'emergency',    // Urgence
+  'community',    // Communauté
+  'environment',  // Environnement
+  'sports',       // Sports
+  'creative',     // Projets créatifs
+  'memorial',     // Cagnotte décès
+  'wedding',      // Mariage
+  'birthday',     // Anniversaire
+  'baby',         // Naissance
+  'travel',       // Voyage
+  'other'         // Autres
+];
+
 // Validation pour les campagnes
 exports.validateCampaign = [
   body('title')
     .notEmpty().withMessage('Le titre est requis')
     .isLength({ min: 5, max: 100 }).withMessage('Le titre doit contenir entre 5 et 100 caractères'),
-  
+
   body('description')
     .notEmpty().withMessage('La description est requise')
-    .isLength({ min: 20, max: 5000 }).withMessage('La description doit contenir entre 20 et 5000 caractères'),
-  
+    .isLength({ min: 10, max: 5000 }).withMessage('La description doit contenir entre 10 et 5000 caractères'),
+
   body('goalAmount')
-    .isFloat({ min: 1 }).withMessage('L\'objectif doit être un nombre positif'),
-  
+    .isFloat({ min: 0 }).withMessage('L\'objectif ne peut pas être négatif'),
+
   body('endDate')
     .isISO8601().withMessage('Date invalide')
     .custom((value) => {
@@ -79,11 +96,11 @@ exports.validateCampaign = [
       }
       return true;
     }),
-  
+
   body('category')
-    .isIn(['sante', 'education', 'projet', 'urgence', 'environnement', 'culture', 'sport', 'entrepreneuriat', 'autre'])
+    .isIn(VALID_CATEGORIES)
     .withMessage('Catégorie invalide'),
-  
+
   exports.validate
 ];
 

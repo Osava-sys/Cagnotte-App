@@ -169,27 +169,42 @@ const processUploadedImage = async (req, res, next) => {
       quality: 85,
       format: outputFormat
     });
-    
-    // Supprimer le fichier temporaire
-    if (fs.existsSync(tempPath)) {
-      fs.unlinkSync(tempPath);
-    }
-    
+
+    // Supprimer le fichier temporaire avec délai (évite EBUSY sur Windows)
+    setTimeout(() => {
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.unlink(tempPath, (err) => {
+            if (err) console.warn('[UPLOAD] Impossible de supprimer le fichier temp:', tempPath);
+          });
+        }
+      } catch (e) {
+        // Ignorer les erreurs de suppression
+      }
+    }, 500);
+
     // Mettre à jour les infos du fichier
     req.file.filename = finalFilename;
     req.file.path = finalPath;
     req.file.processed = true;
-    
+
     // Obtenir la nouvelle taille
     const stats = fs.statSync(finalPath);
     req.file.size = stats.size;
-    
+
     next();
   } catch (error) {
-    // Nettoyer en cas d'erreur
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    console.error('[UPLOAD] Erreur traitement image:', error.message);
+    // Nettoyer en cas d'erreur avec délai
+    setTimeout(() => {
+      try {
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+          fs.unlink(req.file.path, () => {});
+        }
+      } catch (e) {
+        // Ignorer
+      }
+    }, 500);
     next(error);
   }
 };
@@ -229,34 +244,43 @@ const processUploadedImages = async (req, res, next) => {
         quality: 80,
         format: outputFormat
       });
-      
-      // Supprimer le fichier temporaire
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
-      }
-      
+
+      // Supprimer le fichier temporaire avec délai
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(tempPath)) {
+            fs.unlink(tempPath, () => {});
+          }
+        } catch (e) {}
+      }, 500);
+
       // Mettre à jour les infos
       file.filename = finalFilename;
       file.path = finalPath;
       file.processed = true;
-      
+
       const stats = fs.statSync(finalPath);
       file.size = stats.size;
-      
+
       processedFiles.push(file);
     }
-    
+
     req.files = processedFiles;
     next();
   } catch (error) {
-    // Nettoyer en cas d'erreur
-    if (req.files) {
-      req.files.forEach(file => {
-        if (file.path && fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-      });
-    }
+    console.error('[UPLOAD] Erreur traitement images:', error.message);
+    // Nettoyer en cas d'erreur avec délai
+    setTimeout(() => {
+      if (req.files) {
+        req.files.forEach(file => {
+          try {
+            if (file.path && fs.existsSync(file.path)) {
+              fs.unlink(file.path, () => {});
+            }
+          } catch (e) {}
+        });
+      }
+    }, 500);
     next(error);
   }
 };

@@ -1,9 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import CampaignCard from '../components/CampaignCard';
+import { SkeletonGrid } from '../components/Skeleton';
 import { api } from '../services/api';
 
+// Catégories standardisées pour toute la plateforme
+export const CATEGORIES = [
+  { value: '', label: 'Toutes les catégories', icon: '📋' },
+  { value: 'medical', label: 'Santé & Médical', icon: '🏥', color: '#e74c3c' },
+  { value: 'education', label: 'Éducation', icon: '📚', color: '#3498db' },
+  { value: 'emergency', label: 'Urgence', icon: '🚨', color: '#e67e22' },
+  { value: 'community', label: 'Communauté', icon: '🤝', color: '#9b59b6' },
+  { value: 'environment', label: 'Environnement', icon: '🌱', color: '#27ae60' },
+  { value: 'sports', label: 'Sports', icon: '⚽', color: '#1abc9c' },
+  { value: 'creative', label: 'Projets créatifs', icon: '🎨', color: '#f39c12' },
+  { value: 'memorial', label: 'Cagnotte décès', icon: '🕊️', color: '#7f8c8d' },
+  { value: 'wedding', label: 'Mariage', icon: '💒', color: '#e91e63' },
+  { value: 'birthday', label: 'Anniversaire', icon: '🎂', color: '#ff9800' },
+  { value: 'baby', label: 'Naissance', icon: '👶', color: '#00bcd4' },
+  { value: 'travel', label: 'Voyage', icon: '✈️', color: '#673ab7' },
+  { value: 'other', label: 'Autres', icon: '💡', color: '#95a5a6' }
+];
+
 const Home = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [filteredCampaigns, setFilteredCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,6 +32,18 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
+
+  // Lire les paramètres URL au chargement
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const search = params.get('search') || '';
+    const category = params.get('category') || '';
+    const status = params.get('status') || 'active';
+
+    setSearchQuery(search);
+    setCategoryFilter(category);
+    setStatusFilter(status);
+  }, [location.search]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -77,21 +110,45 @@ const Home = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    filterCampaigns();
+    // Mettre à jour l'URL avec les filtres
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    if (categoryFilter) params.set('category', categoryFilter);
+    if (statusFilter && statusFilter !== 'active') params.set('status', statusFilter);
+
+    const queryString = params.toString();
+    navigate(queryString ? `/?${queryString}` : '/', { replace: true });
   };
 
-  const categories = [
-    { value: '', label: 'Toutes les catégories' },
-    { value: 'sante', label: '🏥 Santé' },
-    { value: 'education', label: '📚 Éducation' },
-    { value: 'projet', label: '💡 Projet' },
-    { value: 'urgence', label: '🚨 Urgence' },
-    { value: 'environnement', label: '🌱 Environnement' },
-    { value: 'culture', label: '🎭 Culture' },
-    { value: 'sport', label: '⚽ Sport' },
-    { value: 'entrepreneuriat', label: '🚀 Entrepreneuriat' },
-    { value: 'autre', label: '📦 Autre' }
-  ];
+  const handleCategoryChange = (value) => {
+    setCategoryFilter(value);
+    // Mettre à jour l'URL immédiatement
+    const params = new URLSearchParams(location.search);
+    if (value) {
+      params.set('category', value);
+    } else {
+      params.delete('category');
+    }
+    navigate(`/?${params.toString()}`, { replace: true });
+  };
+
+  const handleStatusChange = (value) => {
+    setStatusFilter(value);
+    const params = new URLSearchParams(location.search);
+    if (value && value !== 'active') {
+      params.set('status', value);
+    } else {
+      params.delete('status');
+    }
+    navigate(`/?${params.toString()}`, { replace: true });
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setCategoryFilter('');
+    setStatusFilter('active');
+    navigate('/', { replace: true });
+  };
 
   return (
     <div className="home-page">
@@ -209,24 +266,27 @@ const Home = () => {
                 <select
                   id="category"
                   value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                 >
-                  {categories.map(cat => (
-                    <option key={cat.value} value={cat.value}>{cat.label}</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.icon} {cat.label}
+                    </option>
                   ))}
                 </select>
               </div>
-              
+
               <div className="filter-group">
                 <label htmlFor="status">Statut</label>
                 <select
                   id="status"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={(e) => handleStatusChange(e.target.value)}
                 >
                   <option value="">Tous les statuts</option>
                   <option value="active">🟢 En cours</option>
-                  <option value="completed">🔵 Terminées</option>
+                  <option value="successful">🎉 Objectif atteint</option>
+                  <option value="expired">⏰ Terminées</option>
                   <option value="pending">🟡 En attente</option>
                 </select>
               </div>
@@ -239,10 +299,10 @@ const Home = () => {
               {filteredCampaigns.length} {filteredCampaigns.length === 1 ? 'cagnotte' : 'cagnottes'} 
               {statusFilter === 'active' ? ' en cours' : ''}
             </h2>
-            {(searchQuery || categoryFilter) && (
-              <button 
-                className="btn-outline" 
-                onClick={() => { setSearchQuery(''); setCategoryFilter(''); }}
+            {(searchQuery || categoryFilter || statusFilter !== 'active') && (
+              <button
+                className="btn-outline"
+                onClick={clearFilters}
               >
                 Effacer les filtres
               </button>
@@ -251,9 +311,7 @@ const Home = () => {
           
           {/* Loading state */}
           {loading && (
-            <div className="loading">
-              <span>Chargement des cagnottes...</span>
-            </div>
+            <SkeletonGrid count={6} />
           )}
 
           {/* Error state */}

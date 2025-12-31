@@ -1,12 +1,61 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleNewsletterSubmit = (e) => {
+    e.preventDefault();
+    if (email) {
+      // Simulation d'inscription à la newsletter
+      setSubscribed(true);
+      setEmail('');
+      setTimeout(() => setSubscribed(false), 5000);
+    }
+  };
+
+  const categories = [
+    { name: 'Santé & Médical', path: '/?category=medical' },
+    { name: 'Éducation', path: '/?category=education' },
+    { name: 'Urgence', path: '/?category=emergency' },
+    { name: 'Communauté', path: '/?category=community' },
+    { name: 'Environnement', path: '/?category=environment' }
+  ];
 
   return (
     <footer className="footer">
       <div className="container">
+        {/* Newsletter Section */}
+        <div className="footer-newsletter">
+          <div className="newsletter-content">
+            <h3>Restez informé</h3>
+            <p>Recevez nos actualités et découvrez des cagnottes inspirantes</p>
+          </div>
+          <form onSubmit={handleNewsletterSubmit} className="newsletter-form">
+            {subscribed ? (
+              <div className="newsletter-success">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Merci pour votre inscription !
+              </div>
+            ) : (
+              <>
+                <input
+                  type="email"
+                  placeholder="Votre adresse email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <button type="submit">S'inscrire</button>
+              </>
+            )}
+          </form>
+        </div>
+
         <div className="footer-content">
           {/* Logo et description */}
           <div className="footer-brand">
@@ -18,7 +67,7 @@ const Footer = () => {
               <span>Cagnotte</span>
             </Link>
             <p className="footer-tagline">
-              La plateforme de cagnotte en ligne sécurisée pour tous vos projets solidaires.
+              La plateforme de cagnotte en ligne sécurisée pour tous vos projets solidaires. Collectez des fonds facilement et en toute confiance.
             </p>
             <div className="footer-social">
               <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
@@ -26,9 +75,9 @@ const Footer = () => {
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                 </svg>
               </a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter/X">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
               </a>
               <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
@@ -52,24 +101,34 @@ const Footer = () => {
                 <li><Link to="/">Accueil</Link></li>
                 <li><Link to="/campaigns/create">Créer une cagnotte</Link></li>
                 <li><Link to="/dashboard">Mon espace</Link></li>
+                <li><Link to="/login">Connexion</Link></li>
+                <li><Link to="/register">Inscription</Link></li>
               </ul>
             </div>
-            
+
             <div className="footer-col">
-              <h4>Informations</h4>
+              <h4>Catégories</h4>
               <ul>
-                <li><Link to="/about">À propos</Link></li>
-                <li><Link to="/how-it-works">Comment ça marche</Link></li>
-                <li><Link to="/faq">FAQ</Link></li>
+                {categories.map((cat, index) => (
+                  <li key={index}><Link to={cat.path}>{cat.name}</Link></li>
+                ))}
               </ul>
             </div>
-            
+
+            <div className="footer-col">
+              <h4>À propos</h4>
+              <ul>
+                <li><Link to="/about">Qui sommes-nous</Link></li>
+                <li><Link to="/faq">FAQ</Link></li>
+                <li><Link to="/contact">Contact</Link></li>
+              </ul>
+            </div>
+
             <div className="footer-col">
               <h4>Légal</h4>
               <ul>
-                <li><Link to="/terms">CGU</Link></li>
-                <li><Link to="/privacy">Confidentialité</Link></li>
-                <li><Link to="/contact">Contact</Link></li>
+                <li><Link to="/terms">Conditions d'utilisation</Link></li>
+                <li><Link to="/privacy">Politique de confidentialité</Link></li>
               </ul>
             </div>
           </div>
@@ -82,31 +141,106 @@ const Footer = () => {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
               </svg>
-              Paiement sécurisé
+              Paiement sécurisé par Stripe
             </span>
             <span className="badge">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
               </svg>
-              100% Gratuit
+              Création gratuite
+            </span>
+            <span className="badge">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+              3% de commission
             </span>
           </div>
         </div>
       </div>
 
       <style>{`
+        .footer-newsletter {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 2rem;
+          padding: 2rem;
+          background: rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          margin-bottom: 3rem;
+        }
+
+        .newsletter-content h3 {
+          font-size: 1.25rem;
+          margin-bottom: 0.25rem;
+          color: white;
+        }
+
+        .newsletter-content p {
+          color: rgba(255, 255, 255, 0.7);
+          margin: 0;
+        }
+
+        .newsletter-form {
+          display: flex;
+          gap: 0.75rem;
+          min-width: 400px;
+        }
+
+        .newsletter-form input {
+          flex: 1;
+          padding: 0.875rem 1.25rem;
+          border: none;
+          border-radius: 25px;
+          font-size: 0.95rem;
+          outline: none;
+        }
+
+        .newsletter-form input:focus {
+          box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+        }
+
+        .newsletter-form button {
+          padding: 0.875rem 1.75rem;
+          background: white;
+          color: var(--primary-color);
+          border: none;
+          border-radius: 25px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        }
+
+        .newsletter-form button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .newsletter-success {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #4ade80;
+          font-weight: 500;
+          background: rgba(74, 222, 128, 0.1);
+          padding: 0.875rem 1.5rem;
+          border-radius: 25px;
+        }
+
         .footer-content {
           display: grid;
-          grid-template-columns: 1fr 2fr;
+          grid-template-columns: 1.2fr 2fr;
           gap: 4rem;
           padding-bottom: 2rem;
           border-bottom: 1px solid rgba(255, 255, 255, 0.15);
         }
-        
+
         .footer-brand {
-          max-width: 280px;
+          max-width: 320px;
         }
-        
+
         .footer-logo {
           display: inline-flex;
           align-items: center;
@@ -118,79 +252,80 @@ const Footer = () => {
           text-decoration: none;
           margin-bottom: 1rem;
         }
-        
+
         .footer-logo:hover {
           opacity: 0.9;
         }
-        
+
         .footer-tagline {
           color: rgba(255, 255, 255, 0.75);
           font-size: 0.95rem;
-          line-height: 1.6;
+          line-height: 1.7;
           margin-bottom: 1.5rem;
         }
-        
+
         .footer-social {
           display: flex;
-          gap: 1rem;
+          gap: 0.75rem;
         }
-        
+
         .footer-social a {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 40px;
-          height: 40px;
+          width: 42px;
+          height: 42px;
           background: rgba(255, 255, 255, 0.1);
           border-radius: 50%;
           color: white;
           transition: all 0.3s ease;
         }
-        
+
         .footer-social a:hover {
-          background: rgba(255, 255, 255, 0.2);
+          background: white;
+          color: var(--primary-color);
           transform: translateY(-3px);
         }
-        
+
         .footer-nav {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 2rem;
         }
-        
+
         .footer-col h4 {
           font-family: 'DM Sans', sans-serif;
-          font-size: 1rem;
+          font-size: 0.9rem;
           font-weight: 700;
           margin-bottom: 1.25rem;
           color: white;
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
-        
+
         .footer-col ul {
           list-style: none;
           padding: 0;
           margin: 0;
         }
-        
+
         .footer-col li {
           margin-bottom: 0.75rem;
         }
-        
+
         .footer-col a {
-          color: rgba(255, 255, 255, 0.75);
+          color: rgba(255, 255, 255, 0.7);
           text-decoration: none;
-          font-size: 0.95rem;
+          font-size: 0.9rem;
           transition: all 0.2s ease;
           display: inline-block;
         }
-        
+
         .footer-col a:hover {
           color: white;
           transform: translateX(4px);
         }
-        
+
         .footer-bottom {
           display: flex;
           justify-content: space-between;
@@ -199,61 +334,88 @@ const Footer = () => {
           flex-wrap: wrap;
           gap: 1rem;
         }
-        
+
         .footer-bottom p {
           color: rgba(255, 255, 255, 0.6);
           font-size: 0.9rem;
           margin: 0;
         }
-        
+
         .footer-badges {
           display: flex;
           gap: 1.5rem;
+          flex-wrap: wrap;
         }
-        
+
         .badge {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
           font-size: 0.85rem;
           color: rgba(255, 255, 255, 0.8);
+          background: rgba(255, 255, 255, 0.05);
+          padding: 0.5rem 1rem;
+          border-radius: 20px;
         }
-        
+
         .badge svg {
           opacity: 0.9;
         }
-        
-        @media (max-width: 992px) {
+
+        @media (max-width: 1024px) {
+          .footer-newsletter {
+            flex-direction: column;
+            text-align: center;
+          }
+
+          .newsletter-form {
+            min-width: 100%;
+            max-width: 500px;
+          }
+
           .footer-content {
             grid-template-columns: 1fr;
             gap: 2.5rem;
           }
-          
+
           .footer-brand {
             max-width: 100%;
             text-align: center;
           }
-          
+
           .footer-social {
             justify-content: center;
           }
+
+          .footer-nav {
+            grid-template-columns: repeat(2, 1fr);
+          }
         }
-        
+
         @media (max-width: 768px) {
+          .newsletter-form {
+            flex-direction: column;
+          }
+
+          .newsletter-form input,
+          .newsletter-form button {
+            width: 100%;
+          }
+
           .footer-nav {
             grid-template-columns: 1fr;
             text-align: center;
           }
-          
+
           .footer-col a:hover {
             transform: none;
           }
-          
+
           .footer-bottom {
             flex-direction: column;
             text-align: center;
           }
-          
+
           .footer-badges {
             flex-direction: column;
             align-items: center;

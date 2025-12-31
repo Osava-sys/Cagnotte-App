@@ -12,10 +12,16 @@ router.get('/search', campaignController.searchCampaigns);
 router.get('/stats', campaignController.getCampaignStats);
 router.get('/:id', campaignController.getCampaignById);
 
+// Track campaign share (public - no auth required)
+router.post('/:id/share', campaignController.trackShare);
+
 // Protected routes
 router.post('/', authenticate, validateCampaign, campaignController.createCampaign);
 router.put('/:id', authenticate, campaignController.updateCampaign);
 router.delete('/:id', authenticate, campaignController.deleteCampaign);
+
+// Campaign updates (notify contributors)
+router.post('/:id/updates', authenticate, campaignController.addCampaignUpdate);
 
 // ===========================================
 // UPLOAD ROUTES

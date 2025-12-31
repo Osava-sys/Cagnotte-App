@@ -98,6 +98,10 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
   lockUntil: Date,
+
+  // Réinitialisation de mot de passe
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
   
   // Timestamps
   createdAt: {

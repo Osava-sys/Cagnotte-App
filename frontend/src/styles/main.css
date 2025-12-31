@@ -849,6 +849,21 @@ img {
   object-fit: cover;
 }
 
+.campaign-header-placeholder {
+  width: 100%;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-cream) 100%);
+  position: relative;
+}
+
+.campaign-header-placeholder .placeholder-emoji {
+  font-size: 5rem;
+  opacity: 0.4;
+}
+
 .campaign-detail {
   display: grid;
   grid-template-columns: 1fr 380px;
@@ -1236,6 +1251,62 @@ img {
 .auth-links a:hover {
   color: var(--primary-hover);
   text-decoration: underline;
+}
+
+.forgot-password-link {
+  display: block;
+  text-align: right;
+  margin-top: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.forgot-password-link:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+.auth-subtitle {
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: var(--space-xl);
+  line-height: 1.6;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: var(--space-xl);
+  color: var(--text-secondary);
+}
+
+.auth-footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.auth-card {
+  background: var(--bg-white);
+  padding: var(--space-2xl);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  max-width: 450px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.auth-card h1 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
 }
 
 /* ============================================
@@ -2360,6 +2431,36 @@ img {
   margin-right: 0.5rem;
 }
 
+/* Boutons formulaire brouillon */
+.form-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.form-buttons .btn-secondary {
+  background: transparent;
+  border: 2px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.form-buttons .btn-secondary:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: var(--primary-lighter);
+}
+
+.draft-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-light);
+  border-radius: var(--radius-md);
+}
+
 /* Section Visuel */
 .create-campaign-visual {
   background: linear-gradient(135deg, var(--primary-color) 0%, #0D5A42 100%);
@@ -2660,9 +2761,79 @@ img {
   background: var(--text-secondary);
 }
 
+.share-btn.linkedin {
+  background: #0A66C2;
+}
+
+.share-btn.email {
+  background: #6B7280;
+}
+
+.share-btn.native {
+  background: var(--primary);
+}
+
+.share-btn.copy.copied {
+  background: var(--success, #10B981);
+}
+
 .share-btn:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+/* Tailles des boutons de partage */
+.share-btn-small {
+  width: 36px;
+  height: 36px;
+}
+
+.share-btn-small svg {
+  width: 16px;
+  height: 16px;
+}
+
+.share-btn-large {
+  width: 52px;
+  height: 52px;
+}
+
+.share-btn-large svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Conteneur des boutons de partage */
+.share-buttons-container {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Section de partage dans la sidebar */
+.share-section-card {
+  background: var(--bg-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.share-section-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.share-section-card .share-description {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-md);
+}
+
+.share-section-card .share-buttons-container {
+  justify-content: flex-start;
 }
 
 /* Page annulation */

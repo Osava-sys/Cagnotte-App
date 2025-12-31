@@ -1,39 +1,29 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { useToast } from '../hooks/useToast';
-import ToastContainer from '../components/ToastContainer';
+import { useToast } from '../contexts/ToastContext';
+import { CATEGORIES as HOME_CATEGORIES } from './Home';
 
-// Images pour les catégories (emoji en fallback)
-const CATEGORIES = {
-  festivite: [
-    { id: 'anniversaire', label: 'Anniversaire', emoji: '🎂', color: '#FFE4C4' },
-    { id: 'mariage', label: 'Mariage / PACS', emoji: '💒', color: '#FFE4E1' },
-    { id: 'naissance', label: 'Naissance / Baptême', emoji: '👶', color: '#E0FFFF' },
-    { id: 'retraite', label: 'Pot de départ', emoji: '🎉', color: '#FFFACD' },
-    { id: 'evenement', label: 'Évènement', emoji: '🎊', color: '#E6E6FA' },
-  ],
-  solidarite: [
-    { id: 'sante', label: 'Santé', emoji: '🏥', color: '#FFE4E1' },
-    { id: 'education', label: 'Éducation', emoji: '📚', color: '#E0F0FF' },
-    { id: 'urgence', label: 'Urgence', emoji: '🚨', color: '#FFE4E4' },
-    { id: 'environnement', label: 'Environnement', emoji: '🌱', color: '#E8F5E9' },
-    { id: 'entraide', label: 'Entraide', emoji: '🤝', color: '#FFF3E0' },
-    { id: 'sport', label: 'Sport', emoji: '⚽', color: '#E3F2FD' },
-    { id: 'culture', label: 'Culture', emoji: '🎭', color: '#F3E5F5' },
-    { id: 'entrepreneuriat', label: 'Entrepreneuriat', emoji: '🚀', color: '#E8EAF6' },
-    { id: 'autre', label: 'Autre projet', emoji: '💡', color: '#F5F5F5' },
-  ]
+// Catégories organisées par groupe (utilisant les catégories standardisées)
+const CATEGORY_GROUPS = {
+  events: {
+    title: 'Événements & Fêtes',
+    items: HOME_CATEGORIES.filter(c => ['birthday', 'wedding', 'baby', 'travel'].includes(c.value))
+  },
+  solidarity: {
+    title: 'Solidarité & Projets',
+    items: HOME_CATEGORIES.filter(c => ['medical', 'education', 'emergency', 'community', 'environment', 'sports', 'creative', 'memorial', 'other'].includes(c.value))
+  }
 };
 
 const CreateCampaign = ({ user }) => {
   const navigate = useNavigate();
-  const { toasts, removeToast, success, error: showError } = useToast();
-  
+  const toast = useToast();
+
   // État du formulaire par étapes
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -42,8 +32,9 @@ const CreateCampaign = ({ user }) => {
     hasGoal: true,
     hideAmounts: false,
   });
-  
+
   const [loading, setLoading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -124,28 +115,31 @@ const CreateCampaign = ({ user }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  // Sauvegarder en brouillon
+  const handleSaveDraft = async () => {
     if (!user) {
       navigate('/login');
       return;
     }
 
+    // Validation minimale pour un brouillon
+    if (!formData.title.trim()) {
+      setError('Le titre est requis pour sauvegarder un brouillon');
+      return;
+    }
+
     try {
-      setLoading(true);
+      setSavingDraft(true);
       setError(null);
-      
+
       const payload = {
         title: formData.title,
-        description: formData.description,
-        goalAmount: formData.hasGoal ? parseFloat(formData.goal) : 0,
-        endDate: formData.deadline,
-        category: selectedCategory || 'autre',
-        shortDescription: formData.description?.slice(0, 200),
-        settings: {
-          hideAmounts: formData.hideAmounts
-        }
+        description: formData.description || 'Brouillon en cours...',
+        goalAmount: formData.hasGoal && formData.goal ? parseFloat(formData.goal) : 100,
+        endDate: formData.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        category: selectedCategory || 'other',
+        shortDescription: formData.description?.slice(0, 200) || '',
+        status: 'draft'
       };
 
       const response = await api.post('/campaigns', payload);
@@ -153,7 +147,7 @@ const CreateCampaign = ({ user }) => {
       const campaignId = created?._id || created?.id;
 
       if (!campaignId) {
-        throw new Error('Impossible de récupérer l\'ID de la campagne créée');
+        throw new Error('Impossible de sauvegarder le brouillon');
       }
 
       if (selectedImage) {
@@ -164,12 +158,64 @@ const CreateCampaign = ({ user }) => {
         }
       }
 
-      success('🎉 Cagnotte créée avec succès !');
+      toast.success('Brouillon sauvegarde !');
+      navigate('/dashboard');
+    } catch (err) {
+      const message = err?.error || err?.message || 'Erreur lors de la sauvegarde';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleSubmit = async (e, asDraft = false) => {
+    e.preventDefault();
+
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        goalAmount: formData.hasGoal ? parseFloat(formData.goal) : 0,
+        endDate: formData.deadline,
+        category: selectedCategory || 'other',
+        shortDescription: formData.description?.slice(0, 200),
+        status: asDraft ? 'draft' : 'active',
+        settings: {
+          hideAmounts: formData.hideAmounts
+        }
+      };
+
+      const response = await api.post('/campaigns', payload);
+      const created = response?.data || response;
+      const campaignId = created?._id || created?.id;
+
+      if (!campaignId) {
+        throw new Error('Impossible de recuperer l\'ID de la campagne creee');
+      }
+
+      if (selectedImage) {
+        try {
+          await uploadImage(campaignId);
+        } catch (uploadErr) {
+          console.warn('Erreur upload image:', uploadErr);
+        }
+      }
+
+      toast.success('Cagnotte creee avec succes !');
       navigate(`/campaigns/${campaignId}`);
     } catch (err) {
-      const message = err?.error || err?.message || 'Erreur lors de la création';
+      const message = err?.error || err?.message || 'Erreur lors de la creation';
       setError(message);
-      showError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -212,7 +258,6 @@ const CreateCampaign = ({ user }) => {
 
   return (
     <div className="create-campaign-page">
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
       
       <div className="create-campaign-container">
         {/* Formulaire à gauche */}
@@ -256,16 +301,16 @@ const CreateCampaign = ({ user }) => {
               </div>
 
               <div className="category-section">
-                <h3>🎉 Festivité et partage</h3>
+                <h3>🎉 {CATEGORY_GROUPS.events.title}</h3>
                 <div className="category-grid">
-                  {CATEGORIES.festivite.map(cat => (
+                  {CATEGORY_GROUPS.events.items.map(cat => (
                     <button
-                      key={cat.id}
-                      className={`category-card ${selectedCategory === cat.id ? 'selected' : ''}`}
-                      onClick={() => handleCategorySelect(cat.id)}
-                      style={{ '--card-bg': cat.color }}
+                      key={cat.value}
+                      className={`category-card ${selectedCategory === cat.value ? 'selected' : ''}`}
+                      onClick={() => handleCategorySelect(cat.value)}
+                      style={{ '--card-bg': cat.color ? `${cat.color}20` : '#f5f5f5' }}
                     >
-                      <div className="category-emoji">{cat.emoji}</div>
+                      <div className="category-emoji">{cat.icon}</div>
                       <span className="category-label">{cat.label}</span>
                     </button>
                   ))}
@@ -273,16 +318,16 @@ const CreateCampaign = ({ user }) => {
               </div>
 
               <div className="category-section">
-                <h3>💚 Solidarité et entraide</h3>
+                <h3>💚 {CATEGORY_GROUPS.solidarity.title}</h3>
                 <div className="category-grid">
-                  {CATEGORIES.solidarite.map(cat => (
+                  {CATEGORY_GROUPS.solidarity.items.map(cat => (
                     <button
-                      key={cat.id}
-                      className={`category-card ${selectedCategory === cat.id ? 'selected' : ''}`}
-                      onClick={() => handleCategorySelect(cat.id)}
-                      style={{ '--card-bg': cat.color }}
+                      key={cat.value}
+                      className={`category-card ${selectedCategory === cat.value ? 'selected' : ''}`}
+                      onClick={() => handleCategorySelect(cat.value)}
+                      style={{ '--card-bg': cat.color ? `${cat.color}20` : '#f5f5f5' }}
                     >
-                      <div className="category-emoji">{cat.emoji}</div>
+                      <div className="category-emoji">{cat.icon}</div>
                       <span className="category-label">{cat.label}</span>
                     </button>
                   ))}
@@ -456,11 +501,11 @@ const CreateCampaign = ({ user }) => {
 
                 {/* Récapitulatif */}
                 <div className="campaign-summary">
-                  <h4>📋 Récapitulatif</h4>
+                  <h4>Recapitulatif</h4>
                   <div className="summary-item">
-                    <span className="summary-label">Catégorie</span>
+                    <span className="summary-label">Categorie</span>
                     <span className="summary-value">
-                      {[...CATEGORIES.festivite, ...CATEGORIES.solidarite].find(c => c.id === selectedCategory)?.label || 'Non défini'}
+                      {HOME_CATEGORIES.find(c => c.value === selectedCategory)?.label || 'Non defini'}
                     </span>
                   </div>
                   <div className="summary-item">
@@ -475,20 +520,42 @@ const CreateCampaign = ({ user }) => {
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  className="btn-primary btn-full btn-large"
-                  disabled={loading || uploadingImage}
-                >
-                  {loading || uploadingImage ? (
-                    <>
-                      <span className="btn-spinner"></span>
-                      {uploadingImage ? 'Upload en cours...' : 'Création...'}
-                    </>
-                  ) : (
-                    '🎉 Créer ma cagnotte'
-                  )}
-                </button>
+                <div className="form-buttons">
+                  <button
+                    type="button"
+                    className="btn-secondary btn-full"
+                    onClick={handleSaveDraft}
+                    disabled={loading || uploadingImage || savingDraft || !formData.title.trim()}
+                  >
+                    {savingDraft ? (
+                      <>
+                        <span className="btn-spinner"></span>
+                        Sauvegarde...
+                      </>
+                    ) : (
+                      '📝 Sauvegarder en brouillon'
+                    )}
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="btn-primary btn-full btn-large"
+                    disabled={loading || uploadingImage || savingDraft}
+                  >
+                    {loading || uploadingImage ? (
+                      <>
+                        <span className="btn-spinner"></span>
+                        {uploadingImage ? 'Upload en cours...' : 'Creation...'}
+                      </>
+                    ) : (
+                      '🎉 Creer ma cagnotte'
+                    )}
+                  </button>
+                </div>
+
+                <p className="draft-hint">
+                  Vous pouvez sauvegarder en brouillon et continuer plus tard depuis votre tableau de bord.
+                </p>
               </form>
             </div>
           )}

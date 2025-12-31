@@ -16,8 +16,20 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const { stripe, stripeConfig } = require('./config/stripe');
 const stripeController = require('./controllers/stripeController');
 
+// Import scheduled tasks
+const { startScheduledTasks, stopScheduledTasks } = require('./utils/scheduledTasks');
+
+// Import email service
+const { initEmailService } = require('./utils/emailService');
+
 // Connect to database
-connectDB();
+connectDB().then(async () => {
+  // Démarrer les tâches planifiées après connexion à la DB
+  startScheduledTasks();
+
+  // Initialiser le service email (crée un compte Ethereal en dev si SMTP non configuré)
+  await initEmailService();
+});
 
 // Initialize app
 const app = express();
@@ -261,23 +273,26 @@ app.use((err, req, res, next) => {
 // ====================
 const gracefulShutdown = () => {
   console.log('\n⚠️  Début de l\'arrêt gracieux...');
-  
+
   const mongoose = require('mongoose');
-  
+
+  // Arrêter les tâches planifiées
+  stopScheduledTasks();
+
   // Fermer le serveur HTTP
   server.close(async () => {
     console.log('📴 Serveur HTTP fermé');
-    
+
     // Fermer la connexion MongoDB
     if (mongoose.connection.readyState === 1) {
       await mongoose.connection.close();
       console.log('📴 Connexion MongoDB fermée');
     }
-    
+
     console.log('👋 Arrêt complet');
     process.exit(0);
   });
-  
+
   // Forcer l'arrêt après 10 secondes
   setTimeout(() => {
     console.error('⏰ Timeout, fermeture forcée');

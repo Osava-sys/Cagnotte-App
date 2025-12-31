@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ContributionForm from '../components/ContributionForm';
+import ShareButtons from '../components/ShareButtons';
+import { SkeletonCampaignDetail } from '../components/Skeleton';
 import { api } from '../services/api';
-import { formatCurrency, calculatePercentage, formatDate } from '../utils/helpers';
+import { formatCurrency, calculatePercentage, formatDate, getImageUrl } from '../utils/helpers';
+import { CATEGORIES } from './Home';
 
 const CampaignDetail = ({ user }) => {
   const { id } = useParams();
@@ -11,6 +14,16 @@ const CampaignDetail = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Tracker le partage sur les réseaux sociaux
+  const handleShare = async (platform) => {
+    try {
+      await api.post(`/campaigns/${id}/share`, { platform });
+    } catch (err) {
+      // Silently fail - le partage a quand même eu lieu
+      console.log('Tracking du partage échoué:', err);
+    }
+  };
 
   useEffect(() => {
     fetchCampaignDetails();
@@ -67,7 +80,13 @@ const CampaignDetail = ({ user }) => {
   };
 
   if (loading) {
-    return <div className="loading">Chargement...</div>;
+    return (
+      <div className="campaign-detail-page">
+        <div className="container">
+          <SkeletonCampaignDetail />
+        </div>
+      </div>
+    );
   }
 
   if (error || !campaign) {
@@ -82,17 +101,27 @@ const CampaignDetail = ({ user }) => {
     ? `${campaign.creator.firstName} ${campaign.creator.lastName}`
     : campaign.creator?.username || campaign.creator?.email || 'Anonyme';
 
+  // Obtenir l'URL de l'image avec gestion des URLs relatives
+  const campaignImage = getImageUrl(campaign.imageUrl, null);
+
+  // Info de la categorie
+  const categoryInfo = CATEGORIES.find(c => c.value === campaign.category) || { label: campaign.category, icon: '', color: '#95a5a6' };
+
   return (
     <div className="campaign-detail-page">
-      {campaign.imageUrl && (
+      {campaignImage ? (
         <div className="campaign-header-image">
-          <img 
-            src={campaign.imageUrl} 
-            alt={campaign.title || 'Campagne'} 
+          <img
+            src={campaignImage}
+            alt={campaign.title || 'Campagne'}
             onError={(e) => {
-              e.target.style.display = 'none';
+              e.target.parentElement.style.display = 'none';
             }}
           />
+        </div>
+      ) : (
+        <div className="campaign-header-placeholder">
+          <span className="placeholder-emoji">{categoryInfo.icon || ''}</span>
         </div>
       )}
       
@@ -195,6 +224,21 @@ const CampaignDetail = ({ user }) => {
               <p>
                 <strong>Contributeurs:</strong> {contributorsCount}
               </p>
+            </div>
+
+            {/* Section Partage */}
+            <div className="share-section-card">
+              <h3>Partager cette cagnotte</h3>
+              <p className="share-description">
+                Aidez cette campagne à atteindre son objectif en la partageant !
+              </p>
+              <ShareButtons
+                url={`${window.location.origin}/campaigns/${campaign.slug || campaign._id || id}`}
+                title={`${campaign.title} - Soutenez cette cagnotte !`}
+                description={campaign.shortDescription || campaign.description?.substring(0, 150) || ''}
+                hashtags={['cagnotte', 'solidarité', campaign.category || 'entraide'].filter(Boolean)}
+                onShare={handleShare}
+              />
             </div>
           </div>
         </div>

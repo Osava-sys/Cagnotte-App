@@ -20,7 +20,7 @@ const campaignSchema = new mongoose.Schema({
   description: {
     type: String,
     required: [true, 'La description est requise'],
-    minlength: [20, 'La description doit contenir au moins 20 caractères'],
+    minlength: [10, 'La description doit contenir au moins 10 caractères'],
     maxlength: [5000, 'La description ne peut dépasser 5000 caractères']
   },
   
@@ -33,7 +33,8 @@ const campaignSchema = new mongoose.Schema({
   goalAmount: {
     type: Number,
     required: [true, 'L\'objectif financier est requis'],
-    min: [1, 'L\'objectif doit être positif']
+    min: [0, 'L\'objectif ne peut pas être négatif'],
+    default: 0
   },
   
   currentAmount: {
@@ -79,22 +80,26 @@ const campaignSchema = new mongoose.Schema({
     }]
   },
   
-  // Catégorie
+  // Catégorie - standardisée avec le frontend
   category: {
     type: String,
     enum: [
-      'sante',
-      'education', 
-      'projet',
-      'urgence',
-      'environnement',
-      'culture',
-      'sport',
-      'entrepreneuriat',
-      'autre'
+      'medical',      // Santé & Médical
+      'education',    // Éducation
+      'emergency',    // Urgence
+      'community',    // Communauté
+      'environment',  // Environnement
+      'sports',       // Sports
+      'creative',     // Projets créatifs
+      'memorial',     // Cagnotte décès
+      'wedding',      // Mariage
+      'birthday',     // Anniversaire
+      'baby',         // Naissance
+      'travel',       // Voyage
+      'other'         // Autres
     ],
     required: [true, 'La catégorie est requise'],
-    default: 'autre'
+    default: 'other'
   },
   
   tags: [{
@@ -181,6 +186,15 @@ const campaignSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
+    sharesByPlatform: {
+      facebook: { type: Number, default: 0 },
+      twitter: { type: Number, default: 0 },
+      whatsapp: { type: Number, default: 0 },
+      linkedin: { type: Number, default: 0 },
+      email: { type: Number, default: 0 },
+      copy: { type: Number, default: 0 },
+      native: { type: Number, default: 0 }
+    },
     views: {
       type: Number,
       default: 0
@@ -255,22 +269,26 @@ campaignSchema.virtual('amountLeft').get(function() {
 // Générer un slug avant sauvegarde
 campaignSchema.pre('save', function(next) {
   if (!this.isModified('title')) return next();
-  
-  // Créer slug à partir du titre
-  this.slug = this.title
+
+  // Créer slug à partir du titre avec un identifiant unique
+  const baseSlug = this.title
     .toLowerCase()
     .replace(/[^\w\s-]/g, '') // Retirer caractères spéciaux
     .replace(/[\s_-]+/g, '-') // Remplacer espaces par tirets
     .replace(/^-+|-+$/g, '') // Retirer tirets au début/fin
-    .substring(0, 50); // Limiter la longueur
-  
+    .substring(0, 40); // Limiter la longueur
+
+  // Ajouter un identifiant unique pour éviter les conflits
+  const uniqueId = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+  this.slug = `${baseSlug}-${uniqueId}`;
+
   // Générer description courte si vide
   if (!this.shortDescription && this.description) {
     this.shortDescription = this.description.substring(0, 200);
   }
-  
-  // Mettre à jour le statut si nécessaire
-  if (this.currentAmount >= this.goalAmount) {
+
+  // Mettre à jour le statut si nécessaire (seulement si goalAmount > 0)
+  if (this.goalAmount > 0 && this.currentAmount >= this.goalAmount) {
     this.status = 'successful';
   } else {
     // Calculer les jours restants directement (daysLeft est un virtual non disponible ici)
@@ -278,12 +296,12 @@ campaignSchema.pre('save', function(next) {
     const end = new Date(this.endDate);
     const diffTime = end - now;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays <= 0 && this.status === 'active') {
       this.status = 'expired';
     }
   }
-  
+
   next();
 });
 

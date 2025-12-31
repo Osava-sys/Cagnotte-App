@@ -82,6 +82,9 @@ const Login = ({ onLogin }) => {
               autoComplete="current-password"
               minLength="8"
             />
+            <Link to="/forgot-password" className="forgot-password-link">
+              Mot de passe oublie ?
+            </Link>
           </div>
 
           <div className="form-actions">

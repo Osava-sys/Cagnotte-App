@@ -5,7 +5,13 @@
 const { stripe, stripeConfig } = require('../config/stripe');
 const Contribution = require('../models/Contribution');
 const Campaign = require('../models/Campaign');
+const User = require('../models/User');
 const config = require('../config/env');
+const {
+  sendContributionConfirmation,
+  sendNewContributionNotification,
+  sendCampaignGoalReached
+} = require('../utils/emailService');
 
 /**
  * Créer une session de checkout Stripe
@@ -342,18 +348,26 @@ async function handleCheckoutSessionCompleted(session) {
   // Trouver et mettre à jour la contribution
   const contribution = await Contribution.findOne({
     'payment.transactionId': session.id
-  });
+  }).populate('campaign');
 
   if (!contribution) {
     console.error(`❌ Contribution non trouvée pour session: ${session.id}`);
     return;
   }
 
+  // Récupérer la campagne avec le créateur
+  const campaign = await Campaign.findById(contribution.campaign._id || contribution.campaign)
+    .populate('creator', 'email firstName lastName username preferences');
+
+  // Stocker l'état précédent pour détecter si l'objectif vient d'être atteint
+  const previousAmount = campaign.currentAmount;
+  const wasGoalReached = previousAmount >= campaign.goalAmount;
+
   // Mettre à jour la contribution
   contribution.status = 'confirmed';
   contribution.payment.status = 'completed';
   contribution.stripePaymentIntentId = session.payment_intent;
-  
+
   // Mettre à jour les frais réels si disponibles
   if (session.amount_total) {
     const actualAmount = session.amount_total / 100;
@@ -363,7 +377,42 @@ async function handleCheckoutSessionCompleted(session) {
   await contribution.save();
   console.log(`✅ Contribution ${contribution._id} confirmée`);
 
-  // La mise à jour de la campagne est gérée par le middleware post-save du modèle
+  // === ENVOI DES EMAILS DE NOTIFICATION ===
+
+  // 1. Email de confirmation au contributeur
+  const contributorEmail = contribution.contributor?.email || session.customer_email;
+  if (contributorEmail) {
+    const contributorData = {
+      email: contributorEmail,
+      firstName: contribution.contributor?.name?.split(' ')[0] || '',
+      name: contribution.contributor?.name || ''
+    };
+
+    sendContributionConfirmation(contributorData, campaign, contribution)
+      .catch(err => console.error('[STRIPE] Erreur email confirmation contributeur:', err.message));
+  }
+
+  // 2. Email de notification au créateur de la campagne
+  if (campaign.creator?.email && campaign.creator?.preferences?.emailNotifications !== false) {
+    const contributorInfo = contribution.isAnonymous
+      ? null
+      : { firstName: contribution.contributor?.name, name: contribution.contributor?.name };
+
+    sendNewContributionNotification(campaign.creator, campaign, contribution, contributorInfo)
+      .catch(err => console.error('[STRIPE] Erreur email notification créateur:', err.message));
+  }
+
+  // 3. Si l'objectif vient d'être atteint, envoyer un email spécial
+  // Recharger la campagne pour avoir le montant mis à jour
+  const updatedCampaign = await Campaign.findById(campaign._id)
+    .populate('creator', 'email firstName lastName username preferences');
+
+  if (!wasGoalReached && updatedCampaign.currentAmount >= updatedCampaign.goalAmount) {
+    if (updatedCampaign.creator?.email && updatedCampaign.creator?.preferences?.emailNotifications !== false) {
+      sendCampaignGoalReached(updatedCampaign.creator, updatedCampaign)
+        .catch(err => console.error('[STRIPE] Erreur email objectif atteint:', err.message));
+    }
+  }
 }
 
 /**
@@ -384,6 +433,20 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
     return;
   }
 
+  // Éviter le double envoi si déjà confirmé (via checkout.session.completed)
+  if (contribution.status === 'confirmed') {
+    console.log(`⚠️ Contribution ${contribution._id} déjà confirmée, skip`);
+    return;
+  }
+
+  // Récupérer la campagne avec le créateur
+  const campaign = await Campaign.findById(contribution.campaign)
+    .populate('creator', 'email firstName lastName username preferences');
+
+  // Stocker l'état précédent pour détecter si l'objectif vient d'être atteint
+  const previousAmount = campaign.currentAmount;
+  const wasGoalReached = previousAmount >= campaign.goalAmount;
+
   contribution.status = 'confirmed';
   contribution.payment.status = 'completed';
   contribution.stripePaymentIntentId = paymentIntent.id;
@@ -391,6 +454,42 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
 
   await contribution.save();
   console.log(`✅ Contribution ${contribution._id} confirmée via PI`);
+
+  // === ENVOI DES EMAILS DE NOTIFICATION ===
+
+  // 1. Email de confirmation au contributeur
+  const contributorEmail = contribution.contributor?.email || paymentIntent.metadata?.contributorEmail;
+  if (contributorEmail) {
+    const contributorData = {
+      email: contributorEmail,
+      firstName: contribution.contributor?.name?.split(' ')[0] || '',
+      name: contribution.contributor?.name || ''
+    };
+
+    sendContributionConfirmation(contributorData, campaign, contribution)
+      .catch(err => console.error('[STRIPE] Erreur email confirmation contributeur:', err.message));
+  }
+
+  // 2. Email de notification au créateur de la campagne
+  if (campaign.creator?.email && campaign.creator?.preferences?.emailNotifications !== false) {
+    const contributorInfo = contribution.isAnonymous
+      ? null
+      : { firstName: contribution.contributor?.name, name: contribution.contributor?.name };
+
+    sendNewContributionNotification(campaign.creator, campaign, contribution, contributorInfo)
+      .catch(err => console.error('[STRIPE] Erreur email notification créateur:', err.message));
+  }
+
+  // 3. Si l'objectif vient d'être atteint, envoyer un email spécial
+  const updatedCampaign = await Campaign.findById(campaign._id)
+    .populate('creator', 'email firstName lastName username preferences');
+
+  if (!wasGoalReached && updatedCampaign.currentAmount >= updatedCampaign.goalAmount) {
+    if (updatedCampaign.creator?.email && updatedCampaign.creator?.preferences?.emailNotifications !== false) {
+      sendCampaignGoalReached(updatedCampaign.creator, updatedCampaign)
+        .catch(err => console.error('[STRIPE] Erreur email objectif atteint:', err.message));
+    }
+  }
 }
 
 /**

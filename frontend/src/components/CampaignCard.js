@@ -1,34 +1,34 @@
-import React from 'react';
-import { formatCurrency, calculatePercentage, isExpired } from '../utils/helpers';
+import React, { useState } from 'react';
+import { formatCurrency, calculatePercentage, isExpired, getImageUrl } from '../utils/helpers';
+import { CATEGORIES } from '../pages/Home';
 
 const CampaignCard = ({ campaign, onClick }) => {
+  const [imageError, setImageError] = useState(false);
   const progress = calculatePercentage(campaign.currentAmount || 0, campaign.goal || 1);
   const expired = campaign.deadline ? isExpired(campaign.deadline) : false;
   const description = campaign.description || campaign.shortDescription || '';
-  const truncatedDescription = description.length > 100 
-    ? description.substring(0, 100) + '...' 
+  const truncatedDescription = description.length > 100
+    ? description.substring(0, 100) + '...'
     : description;
 
   // Obtenir le nombre de contributeurs
-  const contributorsCount = campaign.contributors?.length || 
-                            campaign.stats?.contributors || 
+  const contributorsCount = campaign.contributors?.length ||
+                            campaign.stats?.contributors ||
                             campaign.contributionsCount || 0;
 
-  // Catégorie avec label lisible
-  const getCategoryLabel = (category) => {
-    const categories = {
-      sante: 'Santé',
-      education: 'Éducation',
-      projet: 'Projet',
-      urgence: 'Urgence',
-      environnement: 'Environnement',
-      culture: 'Culture',
-      sport: 'Sport',
-      entrepreneuriat: 'Entrepreneuriat',
-      autre: 'Autre'
-    };
-    return categories[category] || category || 'Projet';
+  // Obtenir l'URL de l'image avec gestion des URLs relatives
+  const imageUrl = getImageUrl(
+    campaign.imageUrl || campaign.images?.mainImage,
+    null
+  );
+
+  // Categorie avec label et icone depuis CATEGORIES standardisees
+  const getCategoryInfo = (categoryValue) => {
+    const cat = CATEGORIES.find(c => c.value === categoryValue);
+    return cat || { label: categoryValue || 'Projet', icon: '', color: '#95a5a6' };
   };
+
+  const categoryInfo = getCategoryInfo(campaign.category);
 
   // Jours restants
   const getDaysRemaining = () => {
@@ -45,31 +45,24 @@ const CampaignCard = ({ campaign, onClick }) => {
   return (
     <article className="campaign-card" onClick={onClick} tabIndex="0" role="button">
       {/* Image */}
-      <div className="campaign-image">
-        {campaign.imageUrl ? (
-          <img 
-            src={campaign.imageUrl} 
-            alt={campaign.title || 'Campagne'} 
+      <div className={`campaign-image ${!imageUrl || imageError ? 'no-image' : ''}`}>
+        {imageUrl && !imageError ? (
+          <img
+            src={imageUrl}
+            alt={campaign.title || 'Campagne'}
             loading="lazy"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.parentElement.classList.add('no-image');
-            }}
+            onError={() => setImageError(true)}
           />
         ) : (
           <div className="placeholder-image">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21,15 16,10 5,21"/>
-            </svg>
+            <span className="placeholder-emoji">{categoryInfo.icon || '🎯'}</span>
           </div>
         )}
-        
+
         {/* Category badge */}
         {campaign.category && (
-          <span className="category-badge">
-            {getCategoryLabel(campaign.category)}
+          <span className="category-badge" style={{ backgroundColor: `${categoryInfo.color}15`, color: categoryInfo.color }}>
+            {categoryInfo.icon} {categoryInfo.label}
           </span>
         )}
       </div>
@@ -162,8 +155,14 @@ const CampaignCard = ({ campaign, onClick }) => {
           justify-content: center;
           width: 100%;
           height: 100%;
+          min-height: 180px;
           color: #b8bcc8;
           background: linear-gradient(135deg, #f5f7f9 0%, #e8ecf0 100%);
+        }
+
+        .placeholder-emoji {
+          font-size: 3rem;
+          opacity: 0.6;
         }
         
         .category-badge {
